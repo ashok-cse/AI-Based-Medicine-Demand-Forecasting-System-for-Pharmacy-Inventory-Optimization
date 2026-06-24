@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Medicines · PharmaForecast{% endblock %}
+{% block heading %}Medicines & Inventory{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="card-title mb-0">Medicine Inventory</h6>
+    <input id="med-search" class="form-control form-control-sm w-auto" placeholder="Search medicine / category…">
+  </div>
+  <div class="table-responsive"><table class="table table-sm table-hover align-middle" id="medicines-table">
+    <thead class="table-light"><tr>
+      <th>ID</th><th>Name</th><th>Category</th><th>Unit Price</th><th>Supplier</th>
+      <th>Storage</th><th>Stock</th><th>Reorder Pt</th><th>Order Qty</th>
+      <th>Days→Stockout</th><th>Expiry</th><th>Expiry Risk</th>
+    </tr></thead>
+    <tbody id="medicines-body"><tr><td colspan="12" class="text-muted">Loading…</td></tr></tbody>
+  </table></div>
+</div></div>
+{% endblock %}
+{% block scripts %}<script>document.addEventListener('DOMContentLoaded', initMedicines);</script>{% endblock %}

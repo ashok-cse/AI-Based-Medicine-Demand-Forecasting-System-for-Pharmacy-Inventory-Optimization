@@ -1,0 +1,19 @@
+# Keep the build context small and the image clean.
+.venv/
+venv/
+env/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.idea/
+.vscode/
+.env
+# Generated artifacts are recreated at runtime (seed/train/forecast).
+models/*.pkl
+models/*.keras
+models/selected_model.json
+data/synthetic_*.csv
+data/_*.csv
+# Keep data/real/salesdaily.csv (the real dataset) so ingestion works in-image.

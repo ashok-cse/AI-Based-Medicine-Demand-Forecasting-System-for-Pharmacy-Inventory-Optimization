@@ -1,0 +1,12 @@
+Flask==3.0.3
+gunicorn==22.0.0
+pymongo==4.8.0
+python-dotenv==1.0.1
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+# tensorflow-cpu publishes only x86_64 Linux wheels (used on Easypanel/VPS).
+# On arm64 (e.g. Apple Silicon) the equivalent wheels live under `tensorflow`.
+tensorflow-cpu==2.16.1; platform_machine == "x86_64"
+tensorflow==2.16.1; platform_machine == "aarch64" or platform_machine == "arm64"
+joblib==1.4.2

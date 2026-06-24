@@ -1,0 +1,114 @@
+:root {
+  --pf-primary: #2563eb;
+  --pf-dark: #0f172a;
+  --pf-sidebar: #111827;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: var(--pf-sidebar);
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+}
+.sidebar .brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: #fff;
+}
+.sidebar .brand i { color: #38bdf8; }
+.sidebar .nav-link {
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: .55rem .8rem;
+  margin-bottom: .15rem;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: .92rem;
+}
+.sidebar .nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+.sidebar .nav-link.active { background: var(--pf-primary); color: #fff; }
+.sidebar-footer { line-height: 1.4; }
+
+/* Content */
+.content { min-height: 100vh; }
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Stat cards */
+.stat-card { position: relative; overflow: hidden; }
+.stat-card .stat-label {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #64748b;
+}
+.stat-card .stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1.1; }
+.stat-card .stat-value-sm { font-size: 1.05rem; font-weight: 600; line-height: 1.2; }
+.stat-card .stat-icon {
+  position: absolute;
+  right: .8rem;
+  bottom: .5rem;
+  font-size: 2rem;
+  opacity: .15;
+}
+
+.card-title { font-size: .95rem; font-weight: 600; color: #334155; }
+
+/* Severity badges */
+.badge-critical { background: #dc2626; color: #fff; }
+.badge-high { background: #ea580c; color: #fff; }
+.badge-medium { background: #ca8a04; color: #fff; }
+.badge-low { background: #64748b; color: #fff; }
+
+.risk-expired { color: #dc2626; font-weight: 600; }
+.risk-high { color: #ea580c; font-weight: 600; }
+.risk-medium { color: #ca8a04; }
+.risk-low { color: #16a34a; }
+
+/* Toasts */
+.toast-area {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.pf-toast {
+  min-width: 280px;
+  padding: .7rem 1rem;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+  font-size: .9rem;
+}
+.pf-toast.info { background: #2563eb; }
+.pf-toast.success { background: #16a34a; }
+.pf-toast.error { background: #dc2626; }
+.pf-toast.working { background: #475569; }
+
+@media (max-width: 768px) {
+  .sidebar { width: 64px; }
+  .sidebar .brand span, .sidebar .nav-link span, .sidebar-footer { display: none; }
+  .sidebar .nav-link { justify-content: center; }
+}

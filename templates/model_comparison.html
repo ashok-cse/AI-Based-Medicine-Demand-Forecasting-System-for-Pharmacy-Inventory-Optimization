@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Model Comparison · PharmaForecast{% endblock %}
+{% block heading %}Model Comparison{% endblock %}
+{% block content %}
+<div class="alert alert-light border small mb-3">
+  All models predict the <strong>same per-medicine daily target</strong> and are scored on the
+  <strong>same held-out points</strong> using a <strong>rolling-origin backtest</strong> (3 folds × 30 days).
+  A <strong>seasonal-naive baseline</strong> ("same weekday last week") is included — a model is only
+  useful if its <strong>skill score &gt; 0</strong> (i.e. it beats the baseline). The lowest-MAE model is selected.
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">MAE / RMSE by Model</h6>
+      <div id="chart-comparison" style="height:340px;"></div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Selected Model</h6>
+      <div id="selected-model-box" class="text-center py-4">
+        <div class="text-muted">Train models to see results.</div>
+      </div>
+    </div></div>
+  </div>
+</div>
+<div class="card border-0 shadow-sm"><div class="card-body">
+  <h6 class="card-title">Metrics</h6>
+  <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+    <thead class="table-light"><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>MAPE (%)</th><th>Skill vs naive</th><th>Selected</th></tr></thead>
+    <tbody id="comparison-body"><tr><td colspan="6" class="text-muted">No metrics yet.</td></tr></tbody>
+  </table></div>
+</div></div>
+{% endblock %}
+{% block scripts %}<script>document.addEventListener('DOMContentLoaded', initModelComparison);</script>{% endblock %}

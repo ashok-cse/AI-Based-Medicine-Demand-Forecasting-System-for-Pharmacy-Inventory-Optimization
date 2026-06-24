@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Forecasts · PharmaForecast{% endblock %}
+{% block heading %}Demand Forecasts{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <label class="form-label small mb-1">Select medicine</label>
+    <select id="forecast-medicine" class="form-select form-select-sm"></select>
+  </div>
+</div>
+<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+  <h6 class="card-title">30-Day Forecast</h6>
+  <div id="chart-medicine-forecast" style="height:360px;"></div>
+</div></div>
+
+<div class="card border-0 shadow-sm"><div class="card-body">
+  <h6 class="card-title">Inventory Recommendations</h6>
+  <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+    <thead class="table-light"><tr>
+      <th>Medicine</th><th>Avg Daily Demand</th><th>Forecast (30d)</th>
+      <th>Safety Stock</th><th>Reorder Pt</th><th>Order Qty</th><th>Confidence</th>
+    </tr></thead>
+    <tbody id="forecast-table-body"><tr><td colspan="7" class="text-muted">Run Forecast to populate.</td></tr></tbody>
+  </table></div>
+</div></div>
+{% endblock %}
+{% block scripts %}<script>document.addEventListener('DOMContentLoaded', initForecasts);</script>{% endblock %}

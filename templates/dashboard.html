@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · PharmaForecast{% endblock %}
+{% block heading %}Dashboard Overview{% endblock %}
+{% block content %}
+<div class="alert alert-light border small mb-3">
+  <i class="bi bi-info-circle"></i>
+  Demo flow: <strong>Seed</strong> → <strong>Train</strong> → <strong>Forecast</strong>, then explore the pages. All data is synthetic.
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4" id="summary-cards">
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Total Medicines</div>
+      <div class="stat-value" id="card-medicines">–</div>
+      <i class="bi bi-capsule stat-icon text-primary"></i>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Low-Stock Alerts</div>
+      <div class="stat-value text-danger" id="card-lowstock">–</div>
+      <i class="bi bi-exclamation-triangle stat-icon text-danger"></i>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Expiry-Risk</div>
+      <div class="stat-value text-warning" id="card-expiry">–</div>
+      <i class="bi bi-hourglass-split stat-icon text-warning"></i>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Recommended Order Qty</div>
+      <div class="stat-value text-info" id="card-orderqty">–</div>
+      <i class="bi bi-cart-plus stat-icon text-info"></i>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Best Model</div>
+      <div class="stat-value-sm" id="card-model">–</div>
+      <i class="bi bi-trophy stat-icon text-success"></i>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="card stat-card border-0 shadow-sm"><div class="card-body">
+      <div class="stat-label">Model MAE</div>
+      <div class="stat-value-sm" id="card-mae">–</div>
+      <i class="bi bi-bullseye stat-icon text-success"></i>
+    </div></div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Aggregate Demand Forecast (next 30 days)</h6>
+      <div id="chart-forecast" style="height:320px;"></div>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Alert Severity</h6>
+      <div id="chart-severity" style="height:320px;"></div>
+    </div></div>
+  </div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Category-wise Stock</h6>
+      <div id="chart-category" style="height:300px;"></div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Model Comparison (MAE)</h6>
+      <div id="chart-models" style="height:300px;"></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Tables -->
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <h6 class="card-title">Top Medicines Needing Restock</h6>
+      <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+        <thead><tr><th>Medicine</th><th>Stock</th><th>Reorder Pt</th><th>Order Qty</th></tr></thead>
+        <tbody id="tbl-restock"><tr><td colspan="4" class="text-muted">Run Forecast to populate.</td></tr></tbody>
+      </table></div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <h6 class="card-title">Medicines Near Expiry</h6>
+      <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+        <thead><tr><th>Medicine</th><th>Expiry</th><th>Days</th><th>Risk</th></tr></thead>
+        <tbody id="tbl-expiry"><tr><td colspan="4" class="text-muted">No data yet.</td></tr></tbody>
+      </table></div>
+    </div></div>
+  </div>
+  <div class="col-12">
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <h6 class="card-title">Recent Alerts</h6>
+      <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+        <thead><tr><th>Severity</th><th>Type</th><th>Message</th><th>Time</th></tr></thead>
+        <tbody id="tbl-alerts"><tr><td colspan="4" class="text-muted">No alerts yet.</td></tr></tbody>
+      </table></div>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>document.addEventListener('DOMContentLoaded', initDashboard);</script>{% endblock %}
