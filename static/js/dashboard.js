@@ -53,20 +53,18 @@ async function runAction(path, workingMsg) {
 }
 
 async function updateMongoStatus() {
-  const badge = document.getElementById('mongo-status');
-  if (!badge) return;
+  const el = document.getElementById('mongo-status');
+  if (!el) return;
+  const set = (cls, label) => {
+    el.className = 'status-pill ' + cls;
+    el.innerHTML = '<span class="dot"></span> ' + label;
+  };
   try {
     const res = await api('/api/health');
-    if (res.mongo_available) {
-      badge.className = 'badge bg-success';
-      badge.textContent = 'MongoDB connected';
-    } else {
-      badge.className = 'badge bg-warning text-dark';
-      badge.textContent = 'CSV fallback mode';
-    }
+    if (res.mongo_available) set('ok', 'MongoDB connected');
+    else set('warn', 'CSV fallback mode');
   } catch {
-    badge.className = 'badge bg-danger';
-    badge.textContent = 'offline';
+    set('down', 'offline');
   }
 }
 

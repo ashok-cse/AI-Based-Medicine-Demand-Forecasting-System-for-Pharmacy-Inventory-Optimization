@@ -1,9 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Medicine Demand Forecasting{% endblock %}</title>
+  <!-- Set theme before paint to avoid flash -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('pf-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -14,47 +27,75 @@
 <body>
 <div class="d-flex">
   <!-- Sidebar -->
-  <nav class="sidebar text-white p-3">
-    <div class="brand mb-4">
-      <i class="bi bi-capsule-pill"></i>
+  <nav class="sidebar p-3">
+    <div class="brand mb-3">
+      <span class="brand-logo"><i class="bi bi-capsule-pill"></i></span>
       <span>PharmaForecast</span>
     </div>
+    <div class="nav-section">Overview</div>
     <ul class="nav flex-column">
-      <li class="nav-item"><a class="nav-link {% if active=='dashboard' %}active{% endif %}" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-      <li class="nav-item"><a class="nav-link {% if active=='medicines' %}active{% endif %}" href="/medicines"><i class="bi bi-capsule"></i> Medicines</a></li>
-      <li class="nav-item"><a class="nav-link {% if active=='forecasts' %}active{% endif %}" href="/forecasts"><i class="bi bi-graph-up-arrow"></i> Forecasts</a></li>
-      <li class="nav-item"><a class="nav-link {% if active=='alerts' %}active{% endif %}" href="/alerts"><i class="bi bi-bell"></i> Alerts</a></li>
-      <li class="nav-item"><a class="nav-link {% if active=='model-comparison' %}active{% endif %}" href="/model-comparison"><i class="bi bi-bar-chart-line"></i> Model Comparison</a></li>
-      <li class="nav-item"><a class="nav-link {% if active=='upload' %}active{% endif %}" href="/upload"><i class="bi bi-upload"></i> Upload Data</a></li>
+      <li class="nav-item"><a class="nav-link {% if active=='dashboard' %}active{% endif %}" href="/"><i class="bi bi-grid-1x2-fill"></i> <span>Dashboard</span></a></li>
+      <li class="nav-item"><a class="nav-link {% if active=='forecasts' %}active{% endif %}" href="/forecasts"><i class="bi bi-graph-up-arrow"></i> <span>Forecasts</span></a></li>
+      <li class="nav-item"><a class="nav-link {% if active=='model-comparison' %}active{% endif %}" href="/model-comparison"><i class="bi bi-bar-chart-line-fill"></i> <span>Model Comparison</span></a></li>
     </ul>
-    <div class="sidebar-footer small text-white-50 mt-4">
+    <div class="nav-section">Inventory</div>
+    <ul class="nav flex-column">
+      <li class="nav-item"><a class="nav-link {% if active=='medicines' %}active{% endif %}" href="/medicines"><i class="bi bi-capsule"></i> <span>Medicines</span></a></li>
+      <li class="nav-item"><a class="nav-link {% if active=='alerts' %}active{% endif %}" href="/alerts"><i class="bi bi-bell-fill"></i> <span>Alerts</span></a></li>
+      <li class="nav-item"><a class="nav-link {% if active=='upload' %}active{% endif %}" href="/upload"><i class="bi bi-cloud-upload-fill"></i> <span>Upload Data</span></a></li>
+    </ul>
+    <div class="sidebar-footer small mt-4">
       University prototype.<br>Synthetic data only.<br><strong>Not medical advice.</strong>
     </div>
   </nav>
 
   <!-- Main content -->
   <main class="content flex-grow-1">
-    <div class="topbar d-flex justify-content-between align-items-center px-4 py-2">
-      <h5 class="mb-0">{% block heading %}Dashboard{% endblock %}</h5>
-      <div class="d-flex align-items-center gap-2">
-        <span id="mongo-status" class="badge bg-secondary">checking…</span>
-        <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-primary" onclick="runAction('/api/seed','Seeding synthetic data…')"><i class="bi bi-database-add"></i> Seed</button>
-          <button class="btn btn-outline-success" onclick="runAction('/api/train','Training models (may take a moment)…')"><i class="bi bi-cpu"></i> Train</button>
-          <button class="btn btn-outline-info" onclick="runAction('/api/generate-forecasts','Generating forecasts…')"><i class="bi bi-magic"></i> Forecast</button>
-        </div>
+    <div class="topbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <p class="page-title">{% block heading %}Dashboard{% endblock %}</p>
+        <span class="page-sub">AI-based medicine demand forecasting &amp; inventory optimization</span>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span id="mongo-status" class="status-pill"><span class="dot"></span> checking…</span>
+        <button class="btn-action" onclick="runAction('/api/seed','Loading dataset…')"><i class="bi bi-database-add"></i> Seed</button>
+        <button class="btn-action" onclick="runAction('/api/train','Training models (may take a moment)…')"><i class="bi bi-cpu"></i> Train</button>
+        <button class="btn-action primary" onclick="runAction('/api/generate-forecasts','Generating forecasts…')"><i class="bi bi-magic"></i> Forecast</button>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme"><i class="bi bi-moon-stars"></i></button>
       </div>
     </div>
 
     <div id="toast-area" class="toast-area"></div>
 
-    <div class="px-4 py-3">
+    <div class="px-4 py-4">
       {% block content %}{% endblock %}
     </div>
   </main>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Theme toggle (self-contained; persists to localStorage)
+  (function () {
+    function syncIcon() {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      var i = document.querySelector('#theme-toggle i');
+      if (i) i.className = dark ? 'bi bi-sun-fill' : 'bi bi-moon-stars';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      syncIcon();
+      var btn = document.getElementById('theme-toggle');
+      if (btn) btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('pf-theme', next); } catch (e) {}
+        syncIcon();
+        // re-render charts so they pick up theme-aware colors
+        if (window.__pfRefresh) window.__pfRefresh();
+      });
+    });
+  })();
+</script>
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% block scripts %}{% endblock %}
