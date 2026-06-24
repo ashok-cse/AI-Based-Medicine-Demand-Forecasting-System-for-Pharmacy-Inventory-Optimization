@@ -35,6 +35,38 @@ def evaluate(y_true, y_pred):
     }
 
 
+def conformal_offsets(residuals, level=0.8):
+    """Split-conformal prediction-interval offsets from held-out residuals.
+
+    Returns (lo_offset, hi_offset) such that [pred + lo, pred + hi] is a `level`
+    (e.g. 80%) prediction interval. Uses the empirical quantiles of the
+    residuals (actual - predicted), so the interval is distribution-free and can
+    be asymmetric -- appropriate for skewed, non-negative demand.
+    """
+    residuals = np.asarray(residuals, float)
+    residuals = residuals[~np.isnan(residuals)]
+    if len(residuals) < 10:
+        return None
+    alpha = 1.0 - level
+    lo = float(np.quantile(residuals, alpha / 2))
+    hi = float(np.quantile(residuals, 1 - alpha / 2))
+    return lo, hi
+
+
+def interval_coverage(y_true, y_pred, lo_offset, hi_offset):
+    """Empirical coverage: fraction of actuals inside [pred+lo, pred+hi].
+
+    For a valid 80% interval this should be ~0.80. Reporting it is the honest
+    test of whether the prediction interval means anything.
+    """
+    y_true = np.asarray(y_true, float)
+    y_pred = np.asarray(y_pred, float)
+    lower = y_pred + lo_offset
+    upper = y_pred + hi_offset
+    inside = (y_true >= lower) & (y_true <= upper)
+    return round(float(np.mean(inside)), 4) if len(y_true) else None
+
+
 def skill_score(model_mae, baseline_mae):
     """Forecast skill vs a naive baseline.
 

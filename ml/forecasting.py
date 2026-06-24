@@ -92,20 +92,16 @@ def _lstm_fold_predictions(df, train_end, seq_len):
         return None
 
 
-def _backtest():
+def _backtest(df, rf_params=None):
     """Run the rolling-origin backtest for all models. Returns pooled true/pred
     arrays per model across all folds, aligned on the same (medicine, date) keys."""
-    df = P.build_feature_frame()
-    if df.empty:
-        raise ValueError("No data available. Seed/ingest data first.")
-
     from ml.preprocessing import FEATURE_COLUMNS, TARGET_COLUMN
 
     cutoffs = _fold_cutoffs(df["date"])
     seq_len = Config.LSTM_SEQUENCE_LENGTH
 
     # pooled, key-aligned predictions
-    keys, y_true = [], []
+    y_true = []
     pred = {"Naive (seasonal)": [], "Linear Regression": [], "Random Forest": [], "LSTM": []}
     lstm_ok = True
 
@@ -117,7 +113,7 @@ def _backtest():
 
         # --- tabular models ---
         lr = M.build_linear_regression().fit(train[FEATURE_COLUMNS].values, train[TARGET_COLUMN].values)
-        rf = M.build_random_forest().fit(train[FEATURE_COLUMNS].values, train[TARGET_COLUMN].values)
+        rf = M.build_random_forest(rf_params).fit(train[FEATURE_COLUMNS].values, train[TARGET_COLUMN].values)
         lr_pred = np.clip(lr.predict(test[FEATURE_COLUMNS].values), 0, None)
         rf_pred = np.clip(rf.predict(test[FEATURE_COLUMNS].values), 0, None)
 
@@ -131,7 +127,6 @@ def _backtest():
 
         for i, (_, row) in enumerate(test.iterrows()):
             key = (row["medicine_id"], row["date"])
-            keys.append(key)
             y_true.append(row[TARGET_COLUMN])
             pred["Naive (seasonal)"].append(naive_pred[i])
             pred["Linear Regression"].append(lr_pred[i])
@@ -142,24 +137,32 @@ def _backtest():
     return np.array(y_true), pred, lstm_ok
 
 
-def _train_final_models():
+def _train_final_models(rf_params=None):
     """Retrain LR & RF on ALL data and persist them for forecast generation.
-    Also trains/saves a representative LSTM artifact when TensorFlow is available."""
+    Also trains/saves a representative LSTM artifact when TensorFlow is available.
+    Returns the RF feature-importance list (for interpretability) when available."""
     from ml.preprocessing import FEATURE_COLUMNS, TARGET_COLUMN
     # Fit production models on the FULL series (no holdout) for forecasting.
     full = P.build_feature_frame()
     if full.empty:
-        return
+        return None
     X = full[FEATURE_COLUMNS].values
     y = full[TARGET_COLUMN].values
+    feature_importance = None
     try:
         lr = M.build_linear_regression().fit(X, y)
         M.save_sklearn_model(lr, Config.LINEAR_MODEL_PATH)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Final LR fit failed: %s", exc)
     try:
-        rf = M.build_random_forest().fit(X, y)
+        rf = M.build_random_forest(rf_params).fit(X, y)
         M.save_sklearn_model(rf, Config.RF_MODEL_PATH)
+        # capture feature importances for the UI (interpretability)
+        feature_importance = sorted(
+            [{"feature": f, "importance": round(float(imp), 4)}
+             for f, imp in zip(FEATURE_COLUMNS, rf.feature_importances_)],
+            key=lambda d: d["importance"], reverse=True,
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Final RF fit failed: %s", exc)
     # representative LSTM artifact (highest-volume medicine) for completeness
@@ -178,12 +181,24 @@ def _train_final_models():
                 M.save_lstm_model(model, Config.LSTM_MODEL_PATH)
     except Exception as exc:  # noqa: BLE001
         logger.warning("LSTM artifact save skipped: %s", exc)
+    return feature_importance
 
 
 def train_all_models():
     """Backtest all models fairly, select the best (lowest MAE that beats naive),
-    retrain final models, and persist comparison + selection."""
-    y_true, pred, lstm_ok = _backtest()
+    derive conformal prediction intervals, retrain final models, and persist
+    comparison + selection (with PI offsets, coverage, and feature importances)."""
+    from ml.preprocessing import FEATURE_COLUMNS, TARGET_COLUMN
+    from ml.evaluation import conformal_offsets, interval_coverage
+
+    df = P.build_feature_frame()
+    if df.empty:
+        raise ValueError("No data available. Seed/ingest data first.")
+
+    # --- light hyperparameter tuning for Random Forest (time-series CV) ---
+    rf_params = M.tune_random_forest(df[FEATURE_COLUMNS].values, df[TARGET_COLUMN].values)
+
+    y_true, pred, lstm_ok = _backtest(df, rf_params)
     if len(y_true) == 0:
         raise RuntimeError("Backtest produced no test points.")
 
@@ -225,8 +240,25 @@ def train_all_models():
         })
     comparison.sort(key=lambda c: (c["mae"] is None, c["mae"]))
 
-    # Retrain & persist production models.
-    _train_final_models()
+    # --- conformal prediction interval (80%) from the best model's residuals ---
+    best_preds = np.array(pred[best_name], dtype=float)
+    bmask = ~np.isnan(best_preds)
+    residuals = y_true[bmask] - best_preds[bmask]
+    pi_level = 0.80
+    offsets = conformal_offsets(residuals, level=pi_level)
+    prediction_interval = None
+    if offsets is not None:
+        lo, hi = offsets
+        coverage = interval_coverage(y_true[bmask], best_preds[bmask], lo, hi)
+        prediction_interval = {
+            "level": pi_level,
+            "lo_offset": round(lo, 4),
+            "hi_offset": round(hi, 4),
+            "empirical_coverage": coverage,
+        }
+
+    # Retrain & persist production models (tuned RF) and capture importances.
+    feature_importance = _train_final_models(rf_params)
 
     metrics_doc = {
         "generated_at": datetime.utcnow().isoformat(),
@@ -236,6 +268,9 @@ def train_all_models():
         "fold_test_days": FOLD_TEST_DAYS,
         "test_points": int(len(y_true)),
         "comparison": comparison,
+        "prediction_interval": prediction_interval,
+        "feature_importance": feature_importance,
+        "rf_params": rf_params,
         "tensorflow_available": M._check_tensorflow(),
     }
     mongo.replace_collection(mongo.MODEL_METRICS, comparison)
@@ -244,9 +279,12 @@ def train_all_models():
         "metrics": next(c for c in comparison if c["model_name"] == best_name),
         "baseline_mae": baseline_mae,
         "backtest": f"{N_FOLDS}-fold rolling origin, {FOLD_TEST_DAYS}d test windows",
+        "prediction_interval": prediction_interval,
+        "feature_importance": feature_importance,
+        "rf_params": rf_params,
         "generated_at": metrics_doc["generated_at"],
     })
-    logger.info("Best model: %s (baseline MAE=%s)", best_name, baseline_mae)
+    logger.info("Best model: %s (baseline MAE=%s, PI=%s)", best_name, baseline_mae, prediction_interval)
     return metrics_doc
 
 
@@ -254,11 +292,16 @@ def train_all_models():
 # Forecast generation (uses the best tabular model for per-medicine granularity)
 # --------------------------------------------------------------------------- #
 def _recursive_tabular_forecast(model, df, horizon):
-    """Generate per-medicine forecasts by recursively rolling features forward."""
-    from ml.preprocessing import FEATURE_COLUMNS
+    """Generate per-medicine forecasts by recursively rolling features forward.
+
+    Builds the SAME feature set as training (lags, rolling stats, harmonic
+    seasonality, trend) so train/serve features stay consistent.
+    """
+    from ml.preprocessing import FEATURE_COLUMNS, harmonic_trend_features
 
     forecasts = []
     last_date = df["date"].max()
+    global_start = df["date"].min()
     for mid, grp in df.groupby("medicine_id"):
         grp = grp.sort_values("date")
         history = list(grp["quantity_sold"].values)
@@ -273,14 +316,24 @@ def _recursive_tabular_forecast(model, df, horizon):
             fdate = last_date + pd.Timedelta(days=h)
             lag_1 = history[-1] if history else 0
             lag_7 = history[-7] if len(history) >= 7 else (history[0] if history else 0)
+            lag_14 = history[-14] if len(history) >= 14 else (history[0] if history else 0)
             roll7 = np.mean(history[-7:]) if history else 0
             roll14 = np.mean(history[-14:]) if history else 0
+            roll28 = np.mean(history[-28:]) if history else 0
+            std7 = np.std(history[-7:], ddof=1) if len(history) >= 2 else 0.0
             season = (0 if fdate.month in (12, 1, 2) else 1 if fdate.month in (3, 4, 5)
                       else 2 if fdate.month in (6, 7, 8) else 3)
-            feats = pd.DataFrame([[
-                fdate.dayofweek, fdate.month, season, lag_1, lag_7,
-                roll7, roll14, temp, disease, outbreak, event, cat_enc,
-            ]], columns=FEATURE_COLUMNS)
+            ht = harmonic_trend_features(fdate, (fdate - global_start).days / 365.0)
+            feat_map = {
+                "day_of_week": fdate.dayofweek, "month": fdate.month, "season_encoded": season,
+                "lag_1": lag_1, "lag_7": lag_7, "lag_14": lag_14,
+                "rolling_mean_7": roll7, "rolling_mean_14": roll14, "rolling_mean_28": roll28,
+                "rolling_std_7": std7, "sin_doy": ht["sin_doy"], "cos_doy": ht["cos_doy"],
+                "trend": ht["trend"], "temperature": temp, "disease_index": disease,
+                "outbreak_alert": outbreak, "local_event_flag": event,
+                "medicine_category_encoded": cat_enc,
+            }
+            feats = pd.DataFrame([[feat_map[c] for c in FEATURE_COLUMNS]], columns=FEATURE_COLUMNS)
             p = float(np.clip(model.predict(feats.values)[0], 0, None))
             history.append(p)
             forecasts.append({
@@ -327,23 +380,40 @@ def generate_forecasts(horizon=None):
 
     raw = _recursive_tabular_forecast(model, df, horizon)
 
-    hist_days = df.groupby("medicine_id")["quantity_sold"].apply(
-        lambda s: int((s > 0).sum())).to_dict()
+    # --- attach conformal prediction-interval bounds (P10/P90 around P50) ---
+    pi = (selected or {}).get("prediction_interval")
+    lo_off = pi["lo_offset"] if pi else None
+    hi_off = pi["hi_offset"] if pi else None
+    pi_level = pi["level"] if pi else None
 
-    def confidence_for(mid):
-        days = hist_days.get(mid, 0)
-        if days >= Config.MIN_HISTORY_FOR_CONFIDENCE * 3:
+    def confidence_for(pred, lower, upper):
+        """Confidence from RELATIVE interval width (real uncertainty, not a guess):
+        narrow band vs the prediction => high confidence."""
+        if pred <= 0 or lower is None:
+            return "low"
+        rel_width = (upper - lower) / max(pred, 1e-6)
+        if rel_width <= 1.0:
             return "high"
-        if days >= Config.MIN_HISTORY_FOR_CONFIDENCE:
+        if rel_width <= 2.5:
             return "medium"
         return "low"
 
     now = datetime.utcnow().isoformat()
     for f in raw:
+        p = f["predicted_quantity"]
+        if lo_off is not None:
+            lower = max(0.0, round(p + lo_off, 2))
+            upper = round(p + hi_off, 2)
+        else:
+            lower, upper = None, None
+        f["predicted_lower"] = lower
+        f["predicted_upper"] = upper
+        f["interval_level"] = pi_level
         f["model_name"] = used_model_name
-        f["confidence_level"] = confidence_for(f["medicine_id"])
+        f["confidence_level"] = confidence_for(p, lower, upper)
         f["created_at"] = now
 
     mongo.replace_collection(mongo.FORECASTS, raw)
-    logger.info("Generated %d forecast rows using %s.", len(raw), used_model_name)
+    logger.info("Generated %d forecast rows using %s (PI level=%s).",
+                len(raw), used_model_name, pi_level)
     return raw

@@ -162,35 +162,8 @@ def build_feature_frame():
     return daily
 
 
-def train_test_split_by_date(df, test_days=None):
-    """Split chronologically: last `test_days` days reserved for testing.
-
-    Using a common cutoff date keeps the test period comparable across models.
-    """
-    test_days = test_days or Config.TEST_SIZE_DAYS
-    if df.empty:
-        return df, df
-    cutoff = df["date"].max() - pd.Timedelta(days=test_days)
-    train = df[df["date"] <= cutoff]
-    test = df[df["date"] > cutoff]
-    return train, test
-
-
-def get_tabular_dataset(test_days=None):
-    """Return (X_train, y_train, X_test, y_test, full_df) for tabular models."""
-    df = build_feature_frame()
-    if df.empty:
-        return None
-    train, test = train_test_split_by_date(df, test_days)
-    X_train = train[FEATURE_COLUMNS].values
-    y_train = train[TARGET_COLUMN].values
-    X_test = test[FEATURE_COLUMNS].values
-    y_test = test[TARGET_COLUMN].values
-    return X_train, y_train, X_test, y_test, df
-
-
 def make_sequences(series, seq_len):
-    """Turn a 1-D array into (X, y) sliding windows for LSTM."""
+    """Turn a 1-D array into (X, y) sliding windows for the LSTM."""
     X, y = [], []
     for i in range(len(series) - seq_len):
         X.append(series[i:i + seq_len])
@@ -198,50 +171,3 @@ def make_sequences(series, seq_len):
     if not X:
         return np.empty((0, seq_len)), np.empty((0,))
     return np.array(X), np.array(y)
-
-
-def get_lstm_dataset(df=None, seq_len=None, test_days=None):
-    """Prepare LSTM sequence data aggregated to total daily demand.
-
-    To keep the LSTM lightweight on a small VPS, we model the *aggregate* daily
-    demand (sum across medicines) as a univariate series. Returns a dict with
-    train/test sequences and the scaler params, or None if insufficient data.
-    """
-    seq_len = seq_len or Config.LSTM_SEQUENCE_LENGTH
-    test_days = test_days or Config.TEST_SIZE_DAYS
-    if df is None:
-        df = build_feature_frame()
-    if df is None or df.empty:
-        return None
-
-    # Aggregate to total daily demand.
-    agg = df.groupby("date")["quantity_sold"].sum().sort_index()
-    if len(agg) < seq_len + test_days + 5:
-        return None
-
-    values = agg.values.astype("float32")
-    # Min-max scale for stable LSTM training.
-    vmin, vmax = float(values.min()), float(values.max())
-    denom = (vmax - vmin) or 1.0
-    scaled = (values - vmin) / denom
-
-    split = len(scaled) - test_days
-    train_series = scaled[:split]
-    # include the tail of train as warm-up context for the test windows
-    test_series = scaled[split - seq_len:]
-
-    X_train, y_train = make_sequences(train_series, seq_len)
-    X_test, y_test = make_sequences(test_series, seq_len)
-    if len(X_train) == 0 or len(X_test) == 0:
-        return None
-
-    return {
-        "X_train": X_train[..., np.newaxis],
-        "y_train": y_train,
-        "X_test": X_test[..., np.newaxis],
-        "y_test": y_test,
-        "scaler": {"min": vmin, "max": vmax},
-        "seq_len": seq_len,
-        "full_scaled": scaled,
-        "dates": agg.index,
-    }

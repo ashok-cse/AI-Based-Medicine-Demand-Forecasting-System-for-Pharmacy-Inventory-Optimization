@@ -209,8 +209,13 @@ async function loadForecasts() {
 function drawMedicineForecast(mid) {
   const rows = __forecastData.forecasts.filter(f => f.medicine_id === mid)
     .sort((a, b) => a.forecast_date.localeCompare(b.forecast_date));
+  const hasBand = rows.length && rows[0].predicted_lower != null;
   renderForecastChart('chart-medicine-forecast',
-    rows.map(r => r.forecast_date), rows.map(r => Number(r.predicted_quantity)));
+    rows.map(r => r.forecast_date),
+    rows.map(r => Number(r.predicted_quantity)),
+    hasBand ? rows.map(r => Number(r.predicted_lower)) : null,
+    hasBand ? rows.map(r => Number(r.predicted_upper)) : null,
+    hasBand ? rows[0].interval_level : null);
 }
 
 function renderForecastTable() {
@@ -301,7 +306,34 @@ async function loadModelComparison() {
         <h4 class="mt-2">${s.best_model}</h4>
         <p class="text-muted mb-1">MAE: <strong>${fmt(s.metrics.mae, 3)}</strong></p>
         <p class="text-muted mb-1">RMSE: ${fmt(s.metrics.rmse, 3)} · MAPE: ${fmt(s.metrics.mape, 2)}%</p>
+        <p class="text-muted mb-1">Skill vs naive: <strong class="text-success">${s.metrics.skill_vs_naive != null ? (s.metrics.skill_vs_naive * 100).toFixed(1) + '%' : '–'}</strong></p>
+        <p class="small text-muted mb-0">${s.backtest || ''}</p>
         <p class="small text-muted">Selected ${(s.generated_at || '').slice(0, 19).replace('T', ' ')}</p>`;
+    }
+
+    // Feature importance chart
+    renderFeatureImportance('chart-importance', (mc.selected || {}).feature_importance);
+
+    // Prediction interval + empirical coverage validation
+    const piBox = document.getElementById('pi-box');
+    const pi = (mc.selected || {}).prediction_interval;
+    if (pi) {
+      const lvl = Math.round(pi.level * 100);
+      const cov = (pi.empirical_coverage * 100).toFixed(1);
+      const covOk = Math.abs(pi.empirical_coverage - pi.level) <= 0.05;
+      const covCls = covOk ? 'text-success' : 'text-warning';
+      piBox.innerHTML = `
+        <p class="mb-2">Forecasts include a <strong>${lvl}% prediction interval</strong> derived
+        from held-out residuals (split-conformal), so each forecast carries honest uncertainty
+        bounds rather than a point guess.</p>
+        <ul class="list-unstyled small mb-2">
+          <li>Interval offsets (P${Math.round((1-pi.level)/2*100)}/P${Math.round((1-(1-pi.level)/2)*100)}):
+            <code>${fmt(pi.lo_offset, 2)}</code> … <code>+${fmt(pi.hi_offset, 2)}</code> units</li>
+          <li>Target coverage: <strong>${lvl}%</strong></li>
+          <li>Empirical coverage on backtest: <strong class="${covCls}">${cov}%</strong>
+            ${covOk ? '<i class="bi bi-check-circle-fill text-success"></i> well-calibrated' : '<i class="bi bi-exclamation-triangle"></i>'}</li>
+        </ul>
+        <p class="small text-muted mb-0">A valid ${lvl}% interval should cover ~${lvl}% of actuals — this is the honest test that the uncertainty estimate means something.</p>`;
     }
   } catch (e) { toast(e.message, 'error'); }
 }

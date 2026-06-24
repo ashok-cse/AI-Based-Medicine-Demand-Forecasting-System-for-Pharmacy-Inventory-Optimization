@@ -1,7 +1,9 @@
 """Unit tests for preprocessing helpers that don't require a database."""
 import numpy as np
 
-from ml.preprocessing import make_sequences, SEASON_MAP
+from datetime import date
+
+from ml.preprocessing import make_sequences, SEASON_MAP, harmonic_trend_features, FEATURE_COLUMNS
 
 
 def test_make_sequences_shapes():
@@ -27,3 +29,16 @@ def test_make_sequences_too_short():
 def test_season_map_covers_four_seasons():
     assert set(SEASON_MAP) == {"Winter", "Spring", "Summer", "Autumn"}
     assert sorted(SEASON_MAP.values()) == [0, 1, 2, 3]
+
+
+def test_harmonic_trend_features_bounds():
+    f = harmonic_trend_features(date(2020, 7, 1), trend_index=1.5)
+    assert set(f) == {"sin_doy", "cos_doy", "trend"}
+    assert -1.0 <= f["sin_doy"] <= 1.0
+    assert -1.0 <= f["cos_doy"] <= 1.0
+    assert f["trend"] == 1.5
+
+
+def test_harmonic_features_are_in_feature_columns():
+    for col in ("sin_doy", "cos_doy", "trend"):
+        assert col in FEATURE_COLUMNS

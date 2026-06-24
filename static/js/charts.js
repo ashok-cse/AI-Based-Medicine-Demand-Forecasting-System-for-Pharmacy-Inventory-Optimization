@@ -15,16 +15,41 @@ function emptyChart(id, msg) {
     `<div class="text-muted text-center pt-5">${msg || 'No data yet.'}</div>`;
 }
 
-function renderForecastChart(id, dates, values) {
+function renderForecastChart(id, dates, values, lower, upper, level) {
   if (!dates || !dates.length) return emptyChart(id, 'Run Forecast to see demand.');
-  Plotly.newPlot(id, [{
+  const traces = [];
+  // Prediction-interval band (fan chart) drawn first, behind the median line.
+  if (lower && upper && lower.length === dates.length) {
+    const pct = level ? Math.round(level * 100) : 80;
+    traces.push({
+      x: dates.concat([...dates].reverse()),
+      y: upper.concat([...lower].reverse()),
+      fill: 'toself', fillcolor: 'rgba(37,99,235,.15)',
+      line: { color: 'rgba(0,0,0,0)' }, hoverinfo: 'skip',
+      name: `${pct}% interval`, type: 'scatter'
+    });
+  }
+  traces.push({
     x: dates, y: values, type: 'scatter', mode: 'lines+markers',
-    line: { color: PF_COLORS.primary, width: 2 }, fill: 'tozeroy',
-    fillcolor: 'rgba(37,99,235,.1)', name: 'Forecast demand'
-  }], {
+    line: { color: PF_COLORS.primary, width: 2 }, name: 'Forecast (P50)'
+  });
+  Plotly.newPlot(id, traces, {
     margin: { t: 10, r: 10, b: 40, l: 45 },
-    xaxis: { title: '' }, yaxis: { title: 'Units' },
-    showlegend: false
+    xaxis: { title: '' }, yaxis: { title: 'Units', rangemode: 'tozero' },
+    showlegend: !!(lower && upper),
+    legend: { orientation: 'h', y: 1.12 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderFeatureImportance(id, importances) {
+  if (!importances || !importances.length) return emptyChart(id, 'Train models to see importances.');
+  const top = importances.slice(0, 10).reverse();
+  Plotly.newPlot(id, [{
+    x: top.map(d => d.importance), y: top.map(d => d.feature),
+    type: 'bar', orientation: 'h', marker: { color: PF_COLORS.success }
+  }], {
+    margin: { t: 10, r: 10, b: 40, l: 130 },
+    xaxis: { title: 'Importance' }
   }, { responsive: true, displayModeBar: false });
 }
 

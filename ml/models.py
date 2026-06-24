@@ -50,15 +50,43 @@ def build_linear_regression():
     ])
 
 
-def build_random_forest():
+# Default RF hyperparameters (modest, VPS-friendly). May be overridden by tuning.
+RF_DEFAULTS = {"n_estimators": 200, "max_depth": 16, "min_samples_leaf": 2}
+
+
+def build_random_forest(params=None):
     """A modest Random Forest, sized to run on a small VPS."""
-    return RandomForestRegressor(
-        n_estimators=120,
-        max_depth=12,
-        min_samples_leaf=3,
-        n_jobs=-1,
-        random_state=42,
-    )
+    p = {**RF_DEFAULTS, **(params or {})}
+    return RandomForestRegressor(n_jobs=-1, random_state=42, **p)
+
+
+def tune_random_forest(X, y, n_splits=3):
+    """Light hyperparameter search for the Random Forest using a time-series CV.
+
+    Returns the best params dict. Kept small so it stays fast on a VPS. Falls
+    back to defaults if tuning fails for any reason.
+    """
+    from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
+
+    try:
+        # Bounded depths + leaf regularization: unbounded trees overfit this
+        # noisy, intermittent demand series and generalize worse on the backtest.
+        grid = {
+            "n_estimators": [200, 300],
+            "max_depth": [6, 8, 12, 16],
+            "min_samples_leaf": [2, 4, 8],
+        }
+        search = RandomizedSearchCV(
+            RandomForestRegressor(n_jobs=-1, random_state=42),
+            grid, n_iter=8, cv=TimeSeriesSplit(n_splits=n_splits),
+            scoring="neg_mean_absolute_error", random_state=42, n_jobs=-1,
+        )
+        search.fit(X, y)
+        logger.info("RF tuning best params: %s", search.best_params_)
+        return search.best_params_
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("RF tuning failed, using defaults: %s", exc)
+        return dict(RF_DEFAULTS)
 
 
 def save_sklearn_model(model, path):

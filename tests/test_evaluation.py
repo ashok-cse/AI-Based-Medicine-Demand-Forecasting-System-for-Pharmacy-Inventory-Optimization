@@ -3,7 +3,10 @@ import math
 
 import numpy as np
 
-from ml.evaluation import mae, rmse, mape, evaluate, skill_score
+from ml.evaluation import (
+    mae, rmse, mape, evaluate, skill_score,
+    conformal_offsets, interval_coverage,
+)
 
 
 def test_mae_basic():
@@ -44,3 +47,23 @@ def test_skill_score():
 def test_empty_inputs_are_nan():
     assert math.isnan(mae([], []))
     assert math.isnan(rmse([], []))
+
+
+def test_conformal_offsets_and_coverage():
+    rng = np.random.default_rng(0)
+    # residuals ~ N(0, 1); an 80% interval should cover ~80% of fresh residuals
+    residuals = rng.normal(0, 1, 5000)
+    lo, hi = conformal_offsets(residuals, level=0.8)
+    assert lo < 0 < hi
+    # offsets should be near the +/-1.28 sigma quantiles of a standard normal
+    assert abs(lo + 1.28) < 0.15
+    assert abs(hi - 1.28) < 0.15
+    # coverage of the same distribution should be close to 0.8
+    y_pred = np.zeros(5000)
+    y_true = rng.normal(0, 1, 5000)
+    cov = interval_coverage(y_true, y_pred, lo, hi)
+    assert 0.74 < cov < 0.86
+
+
+def test_conformal_offsets_too_few():
+    assert conformal_offsets([1, 2, 3], level=0.8) is None
